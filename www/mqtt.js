@@ -43,6 +43,9 @@ var mqtt = {
 	setOnMessageArrived: function(func){
 		mqtt.client.onMessageArrived = func;
 	},
+	setOnMessageDelivered: function(func){
+		mqtt.client.onMessageDelivered = func;
+	},
 	setOnConnectionLost: function(func){
 		mqtt.client.onConnectionLost = func;
 	}
