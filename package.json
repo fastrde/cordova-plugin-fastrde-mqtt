@@ -1,0 +1,33 @@
+{
+  "name": "cordova-plugin-fastrde-mqtt",
+  "version": "0.2.0",
+  "description": "Cordova plugin to communicate via mqtt for ios and android",
+  "cordova": {
+    "id": "cordova-plugin-fastrde-mqtt",
+    "platforms": [
+      "android",
+			"ios"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fastrde/cordova-plugin-fastrde-mqtt"
+  },
+  "bugs": {
+    "url": "https://github.com/fastrde/cordova-plugin-fastrde-mqtt/issues"
+  },
+  "keywords": [
+    "cordova",
+    "ecosystem:cordova",
+    "cordova-android",
+    "cordova-ios",
+		"mqtt",
+		"push",
+		"iot"
+  ],
+  "author": {
+    "name": "Fabian Strachanski",
+    "email": "mail@fastr.de"
+  },
+  "license": "MIT"
+}
