@@ -27,10 +27,16 @@
 
   <platform name="android">
     <source-file src="src/android/MQTTPlugin.java" target-dir="src/de/fastr/cordova/plugin" />
+		<source-file src="src/android/paho/org.eclipse.paho.client.mqttv3-1.0.2.jar" target-dir="libs" framework="true" />
     <config-file target="res/xml/config.xml" parent="/*">
       <feature name="MQTTPlugin">
         <param name="android-package" value="de.fastr.cordova.plugin.MQTTPlugin"/>
       </feature>
     </config-file>
+		<config-file target="AndroidManifest.xml" parent="/manifest">
+			<uses-permission android:name="android.permission.INTERNET" />
+			<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+			<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+   	</config-file>
   </platform>
 </plugin>

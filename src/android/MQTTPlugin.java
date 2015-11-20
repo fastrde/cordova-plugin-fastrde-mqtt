@@ -3,6 +3,7 @@ package de.fastr.cordova.plugin;
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaResourceApi;
+import org.apache.cordova.CordovaWebView;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -20,30 +21,73 @@ import java.security.NoSuchAlgorithmException;
 import java.math.BigInteger;
 
 import android.net.Uri;
+import android.util.Log;
+import android.content.Context;
 
-public class MQTTPlugin extends CordovaPlugin{
+import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
+import org.eclipse.paho.client.mqttv3.MqttDeliveryToken;
+import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttSecurityException;
+import org.eclipse.paho.client.mqttv3.MqttTopic;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.eclipse.paho.client.mqttv3.MqttClientPersistence;
+import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
+
+public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
 
 	private final String TAG = "MQTTPlugin";
 	private MqttClient client;
 	private MqttConnectOptions connOpts;
 	private CallbackContext onConnectCallbackContext;
 
-	@Override
+	public void deliveryComplete(IMqttDeliveryToken token) {
+
+	}
+
+	/*@Override
 	public void initialize(CordovaInterface cordova, CordovaWebView webView) {
     super.initialize(cordova, webView);
     // your init code here
+	}*/
+
+	public void connectionLost(Throwable cause){
+
 	}
+	public void messageArrived(String topic, MqttMessage mqttMessage) throws Exception{
+		JSONObject message = new JSONObject();
+		message.put("topic", topic); 
+		message.put("message", new String(mqttMessage.getPayload()));
+		message.put("qos", mqttMessage.getQos());
+		message.put("retain", mqttMessage.isRetained());
+		final String jsonString = message.toString();
+		final CordovaWebView webView_ = webView;
+		cordova.getActivity().runOnUiThread(new Runnable() {
+    	public void run() {
+				webView_.loadUrl(String.format("javascript:mqtt.onMessage(%s);", jsonString));
+      }
+    });
+		Log.d(TAG, String.format("mqtt.onMessage(%s);", message.toString()));
+	}
+
 
 	public boolean execute(String action, JSONArray args, final CallbackContext callbackContext) throws JSONException {
 		if (action.equals("connect")){
 			String host = args.getString(0);
-			int port = args.getInt(1);
-			if (!port){
-				port = 1883;
+			int port = 1883;
+			if (args.length() > 1){
+				port = args.getInt(1);
 			}
-			JSONObject options = args.getJSONObject(2);
+			JSONObject options = null;
+			if (args.length() > 2){
+				options = args.getJSONObject(2);
+			}else{
+				options = new JSONObject();
+			}
 			onConnectCallbackContext = callbackContext;
-			connect(host, port, args);
+			connect(host, port, options);
 			return true;
 		}else if (action.equals("disconnect")){
 			disconnect();
@@ -53,41 +97,48 @@ public class MQTTPlugin extends CordovaPlugin{
 			String msg = args.getString(1);
 			int qos = args.getInt(2);
 			boolean retained = args.getBoolean(3);
-			publish(String topic, String msg, int qos, boolean retained);
+			publish(topic, msg, qos, retained);
 			return true;
 		}else if (action.equals("subscribe")){
 			String topic = args.getString(0);
 			int qos = args.getInt(1);
-			subscribe(String topic, int qos);
+			subscribe(topic, qos);
 			return true;
 		}else if (action.equals("unsubscribe")){
 			String topic = args.getString(0);
-			unsubscribe(String topic);
+			unsubscribe(topic);
 			return true;
 		}
 		return false;
 	}
 
-	private void connect(String host, int port, JSONArray options){
+	private void connect(final String host, final int port, final JSONObject options){
+		final Context context = cordova.getActivity().getApplicationContext(); 
+		final MQTTPlugin self = this;
+
+		cordova.getThreadPool().execute(new Runnable() {
+                public void run() {
 		String clientId = "mqtt-client";
 		String protocol = "tcp";
+		try{
 		if (options.has("ssl") && options.getBoolean("ssl")){
 			protocol = "ssl";
 		}
 		if (options.has("clientId")) clientId = options.getString("clientId"); 
+		MqttClientPersistence persistence = new MqttDefaultFilePersistence(context.getApplicationInfo().dataDir);	
 
-		client = new MqttClient(protocol + "://" + host + ":" + port, options.getString("clientId"));			
+		client = new MqttClient(protocol + "://" + host + ":" + port, options.getString("clientId"), persistence);			
 		connOpts = new MqttConnectOptions();	
 
 		if (options.has("userName")) connOpts.setUserName(options.getString("userName"));
-		if (options.has("password")) connOpts.setPassword(options.getString("password"));
+		if (options.has("password")) connOpts.setPassword(options.getString("password").toCharArray());
 		if (options.has("keepAliveInterval")) connOpts.setKeepAliveInterval(options.getInt("keepAliveInterval"));
-		if (options.has("cleanSessionFlag")) connOpts.setCleanSession(options.getBoolean("cleanSession"));
+		if (options.has("cleanSessionFlag")) connOpts.setCleanSession(options.getBoolean("cleanSessionFlag"));
 		if (options.has("protocolLevel")) connOpts.setMqttVersion(options.getInt("protocolLevel"));
 
 		if (options.has("will")){
 			JSONObject will = options.getJSONObject("will");
-			connOpts.setWill(options.getString("topic"), options.getString("message"), options.getInt("qos"), options.getBoolean("retain"));
+			connOpts.setWill(options.getString("topic"), options.getString("message").getBytes(), options.getInt("qos"), options.getBoolean("retain"));
 		}
 		Log.d(TAG, "connect "+host+":"+port);
 		Log.d(TAG, "=================");
@@ -95,26 +146,72 @@ public class MQTTPlugin extends CordovaPlugin{
 		Log.d(TAG, "userName: " + connOpts.getUserName());
 		Log.d(TAG, "password: " + connOpts.getPassword());
 		Log.d(TAG, "keepAliveInterval: " + connOpts.getKeepAliveInterval());
-		Log.d(TAG, "cleanSessionFlag: " + connOpts.isCleanSession()?"true":"false");
+		Log.d(TAG, "cleanSessionFlag: " + (connOpts.isCleanSession()?"true":"false"));
 		Log.d(TAG, "protocolLevel: " + connOpts.getMqttVersion());
-		Log.d(TAG, "ssl: " + if (protocol.equals("ssl")?"true":"false");
+		Log.d(TAG, "ssl: " + (protocol.equals("ssl")?"true":"false"));
 		client.connect(connOpts);
-		onConnectCallbackContext.succhess(client.isConnected());
+
+		client.setCallback((MqttCallback) self);	
+		onConnectCallbackContext.success((client.isConnected()?1:0));
+		}catch(JSONException e){
+			Log.d(TAG, "Exception", e);
+		}catch(MqttException e){
+			Log.d(TAG, "Exception", e);
+			Log.d(TAG, e.getMessage());
+		}
+                }
+            });
 	}
 
 	private void disconnect(){
+		cordova.getThreadPool().execute(new Runnable() {
+                public void run() {
+		try{
 		client.disconnect();
+		}catch(MqttException e){
+			Log.d(TAG, "Exception", e);
+			Log.d(TAG, e.getMessage());
+		}
+                }
+            });
 	}
 
-	private void publish(String topic, String msg, int qos, boolean retained){
-		client.publish(topic, msg, qos, retained);
+	private void publish(final String topic, final String msg, final int qos, final boolean retained){
+		cordova.getThreadPool().execute(new Runnable() {
+                public void run() {
+		try{
+		client.publish(topic, msg.getBytes(), qos, retained);
+		}catch(MqttException e){
+			Log.d(TAG, "Exception", e);
+			Log.d(TAG, e.getMessage());
+		}
+                }
+            });
 	}
 
-	private void subscribe(String topic, int qos){
+	private void subscribe(final String topic, final int qos){
+		cordova.getThreadPool().execute(new Runnable() {
+                public void run() {
+		try{
 		client.subscribe(topic, qos);
+		}catch(MqttException e){
+			Log.d(TAG, "Exception", e);
+			Log.d(TAG, e.getMessage());
+		}
+                }
+            });
 	}
 
-	private void unsubscribe(String topic){
+	private void unsubscribe(final String topic){
+		cordova.getThreadPool().execute(new Runnable() {
+                public void run() {
+		try{
 		client.unsubscribe(topic);
+		}catch(MqttException e){
+			Log.d(TAG, "Exception", e);
+			Log.d(TAG, e.getMessage());
+		}
+                }
+            });
 	}
 }
