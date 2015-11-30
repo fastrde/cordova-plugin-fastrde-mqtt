@@ -12,13 +12,31 @@ var mqtt={
 		retain: null
 		qos: 0
 	}*/,	
-	on: function(evt, func){
+	on: function(evt, success, fail){
 		switch(evt){
 			case 'connect':
-				mqtt.onConnect = func;
+				mqtt.onConnect = success;
+				mqtt.onConnectError = fail;
+			break;
+			case 'disconnect':
+				mqtt.onDisconnect = success;
+				mqtt.onDisconnectError = fail;
+			break;
+			case 'publish':
+				mqtt.onPublish = success;
+				mqtt.onPublishError = fail;
+			break;
+			case 'subscribe':
+				mqtt.onSubscribe = success;
+				mqtt.onSubscribeError = fail;
+			break;
+			case 'unsubscribe':
+				mqtt.onUnsubscribe = success;
+				mqtt.onUnsubscribeError = fail;
 			break;
 			case 'message':
-				mqtt.onMessage = func;
+				mqtt.onMessage = success;
+				mqtt.onMessageError = fail;
 		}
 	},
 	connect: function(options){
@@ -31,10 +49,21 @@ var mqtt={
 				mqtt.onConnect();
 			}, 
 			function(err) {
+				mqtt.onConnectError();
       }, 
 			"MQTTPlugin", "connect", [host, port, options]);
 	},
 	disconnect: function(){
+		cordova.exec(
+			function(success){
+				console.log("js disconnected success");
+				mqtt.onDisconnect();
+			}, 
+			function(err) {
+				console.log("js disconnected error");
+				mqtt.onDisconnectError();
+      }, 
+			"MQTTPlugin", "disconnect", []);
 	},
 	publish: function(options){ //topic, payload, qos, retained){
 		var topic = (isset(options.topic)) ? options.topic : "public";	
@@ -47,6 +76,7 @@ var mqtt={
 				console.log("js publish success");
 			}, 
 			function(err) {
+				console.log("js publish error");
       }, 
 			"MQTTPlugin", "publish", [topic, message, qos, retain]);
 	},
@@ -59,23 +89,40 @@ var mqtt={
 				console.log("js subscribe success");
 			}, 
 			function(err) {
+				console.log("js subscribe error");
       }, 
 			"MQTTPlugin", "subscribe", [topic, qos]);
 	},
-	unsubscribe: function (topic){
+	unsubscribe: function (options){ //topic){
+		var topic = (isset(options.topic)) ? options.topic : "public";	
+		cordova.exec(
+			function(success){
+				console.log("js unsubscribe success");
+			}, 
+			function(err) {
+				console.log("js unsubscribe error");
+      }, 
+			"MQTTPlugin", "unsubscribe", [topic]);
 	},
-	onConnect: function(){
-	},
-	onReconnect: function(){
-	},
-	onClose: function(){
-	},
-	onOffline: function(){
-	},
-	onError: function(){
-	},
-	onMessage: function(topic, message, packet){
-	}
+
+
+	onConnect: function(){ },
+	onConnectError: function(){ },
+	onDisconnect: function(){ },
+	onDisconnectError: function(){ },
+	onPublish: function(){ },
+	onPublishError: function(){ },
+	onSubscribe: function(){ },
+	onSubscribeError: function(){ },
+	onUnsubscribe: function(){ },
+	onUnsubscribeError: function(){ },
+	onMessage: function(topic, message, packet){ },
+	onMessageError: function(topic, message, packet){ },
+
+	onReconnect: function(){ },
+	onClose: function(){ },
+	onOffline: function(){ },
+	onError: function(){ }
 }
 
 function isset(obj){
