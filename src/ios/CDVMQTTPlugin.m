@@ -9,6 +9,7 @@
   NSLog(@"MQTT Initialized");
   session = [[MQTTSession alloc] init];
   session.delegate = self; // setDelegate:self];
+	session.persistence.persistent = PERSISTENT;
 }
 
 - (void)connect:(CDVInvokedUrlCommand*)command{
@@ -132,6 +133,12 @@
   NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
   [self.commandDelegate evalJs:[NSString stringWithFormat:@"mqtt.onMessage(%@);", jsonString]];
 }
+
+- (void)messageDelivered:(MQTTSession*)session msgID(UInt16)msgID
+{
+	NSLog(@"Message ID:%u deliviered", msgID);
+}
+
 
 - (void)handleEvent:(MQTTSession *)session event:(MQTTSessionEvent)eventCode error:(NSError *)error
 {

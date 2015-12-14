@@ -70,13 +70,16 @@ var mqtt={
 		var message = (isset(options.message)) ? options.message : "";	
 		var qos = (isset(options.qos)) ? options.qos : 0;	
 		var retain = (isset(options.retain)) ? options.retain : false;	
+		var cacheId = (isset(options.cacheId)) ? options.cacheId : null;
 		console.log("js publish");
 		cordova.exec(
 			function(success){
 				console.log("js publish success");
+				mqtt.onPublish(success, cacheId);
 			}, 
 			function(err) {
 				console.log("js publish error");
+				mqtt.onPublishError(err, cacheId);
       }, 
 			"MQTTPlugin", "publish", [topic, message, qos, retain]);
 	},
@@ -87,9 +90,11 @@ var mqtt={
 		cordova.exec(
 			function(success){
 				console.log("js subscribe success");
+				mqtt.onSubscribe();
 			}, 
 			function(err) {
 				console.log("js subscribe error");
+				mqtt.onSubscribeError();
       }, 
 			"MQTTPlugin", "subscribe", [topic, qos]);
 	},
@@ -98,9 +103,11 @@ var mqtt={
 		cordova.exec(
 			function(success){
 				console.log("js unsubscribe success");
+				mqtt.onUnsubscribe();
 			}, 
 			function(err) {
 				console.log("js unsubscribe error");
+				mqtt.onUnsubscribeError();
       }, 
 			"MQTTPlugin", "unsubscribe", [topic]);
 	},
