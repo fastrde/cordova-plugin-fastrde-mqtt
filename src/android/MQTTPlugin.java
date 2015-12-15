@@ -47,9 +47,27 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
   private CallbackContext onSubscribeCallbackContext;
   private CallbackContext onUnsubscribeCallbackContext;
 
-  public void deliveryComplete(IMqttDeliveryToken token) { }
+  public void deliveryComplete(IMqttDeliveryToken token) { 
+		JSONObject message = new JSONObject();
+    final String jsonString = message.toString();
+    final CordovaWebView webView_ = webView;
+    cordova.getActivity().runOnUiThread(new Runnable() {
+      public void run() {
+        webView_.loadUrl(String.format("javascript:mqtt.onDelivered(%s);", jsonString));
+      }   
+    }); 
+	}
 
-  public void connectionLost(Throwable cause){ }
+  public void connectionLost(Throwable cause){ 
+		JSONObject message = new JSONObject();
+    final String jsonString = message.toString();
+    final CordovaWebView webView_ = webView;
+    cordova.getActivity().runOnUiThread(new Runnable() {
+      public void run() {
+        webView_.loadUrl(String.format("javascript:mqtt.onOffline(%s);", jsonString));
+      }
+    });
+	}
 
 
   public void messageArrived(String topic, MqttMessage mqttMessage) throws Exception{

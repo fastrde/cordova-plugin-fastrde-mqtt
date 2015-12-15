@@ -129,7 +129,8 @@ var mqtt={
 	onReconnect: function(){ },
 	onClose: function(){ },
 	onOffline: function(){ },
-	onError: function(){ }
+	onError: function(){ },
+	onDelivered: function(){ }
 }
 
 function isset(obj){
