@@ -47,6 +47,20 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
   private CallbackContext onSubscribeCallbackContext;
   private CallbackContext onUnsubscribeCallbackContext;
 
+/*	private String host;
+	private int port;
+	private int qos;
+	private String clientId;
+	private String username;
+	private String password;
+	private boolean ssl;
+	private int keepAlive;
+	private int timeout;
+	private boolean cleanSession;
+	private int protocol;
+	private boolean offlineCaching;
+*/
+
   public void deliveryComplete(IMqttDeliveryToken token) { }
 
   public void connectionLost(Throwable cause){ }
@@ -84,6 +98,7 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
         options = new JSONObject();
       }
       onConnectCallbackContext = callbackContext;
+			Log.d(TAG, "" + host + " : " + port);
       connect(host, port, options);
       return true;
 
@@ -121,7 +136,6 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
     return false;
   }
 
-
   private void connect(final String host, final int port, final JSONObject options){
     final Context context = cordova.getActivity().getApplicationContext(); 
     final MQTTPlugin self = this;
@@ -140,11 +154,11 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
           client = new MqttClient(protocol + "://" + host + ":" + port, options.getString("clientId"), persistence);      
           connOpts = new MqttConnectOptions();  
 
-          if (options.has("userName")) connOpts.setUserName(options.getString("userName"));
+          if (options.has("username")) connOpts.setUserName(options.getString("username"));
           if (options.has("password")) connOpts.setPassword(options.getString("password").toCharArray());
-          if (options.has("keepAliveInterval")) connOpts.setKeepAliveInterval(options.getInt("keepAliveInterval"));
-          if (options.has("cleanSessionFlag")) connOpts.setCleanSession(options.getBoolean("cleanSessionFlag"));
-          if (options.has("protocolLevel")) connOpts.setMqttVersion(options.getInt("protocolLevel"));
+          if (options.has("keepAlive")) connOpts.setKeepAliveInterval(options.getInt("keepAlive"));
+          if (options.has("cleanSession")) connOpts.setCleanSession(options.getBoolean("cleanSession"));
+          if (options.has("protocol")) connOpts.setMqttVersion(options.getInt("protocol"));
 
           if (options.has("will")){
             JSONObject will = options.getJSONObject("will");
