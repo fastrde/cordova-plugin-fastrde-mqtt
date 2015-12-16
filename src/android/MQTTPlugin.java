@@ -2,6 +2,7 @@ package de.fastr.cordova.plugin;
 
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CallbackContext;
+import org.apache.cordova.PluginResult;
 import org.apache.cordova.CordovaResourceApi;
 import org.apache.cordova.CordovaWebView;
 
@@ -24,6 +25,7 @@ import android.net.Uri;
 import android.util.Log;
 import android.content.Context;
 
+//import org.eclipse.paho.client.mqttv3.MqttAsyncClient;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttDeliveryToken;
@@ -39,15 +41,15 @@ import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
 public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
 
   private final String TAG = "MQTTPlugin";
+  //private MqttAsyncClient client;
   private MqttClient client;
   private MqttConnectOptions connOpts;
   private CallbackContext onConnectCallbackContext;
   private CallbackContext onDisconnectCallbackContext;
-  private CallbackContext onPublishCallbackContext;
+  //private CallbackContext onPublishCallbackContext;
   private CallbackContext onSubscribeCallbackContext;
   private CallbackContext onUnsubscribeCallbackContext;
 
-<<<<<<< HEAD
 /*	private String host;
 	private int port;
 	private int qos;
@@ -129,12 +131,12 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
 
     //Publish
     }else if (action.equals("publish")){
-      onPublishCallbackContext = callbackContext;
-      String topic = args.getString(0);
-      String msg = args.getString(1);
-      int qos = args.getInt(2);
-      boolean retained = args.getBoolean(3);
-      publish(topic, msg, qos, retained);
+      int id = args.getInt(0);
+      String topic = args.getString(1);
+      String msg = args.getString(2);
+      int qos = args.getInt(3);
+      boolean retained = args.getBoolean(4);
+      publish(id, topic, msg, qos, retained, callbackContext);
       return true;
 
     //Subscribe
@@ -170,6 +172,7 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
           if (options.has("clientId")) clientId = options.getString("clientId"); 
           MqttClientPersistence persistence = new MqttDefaultFilePersistence(context.getApplicationInfo().dataDir);  
 
+          //client = new MqttAsyncClient(protocol + "://" + host + ":" + port, options.getString("clientId"), persistence);      
           client = new MqttClient(protocol + "://" + host + ":" + port, options.getString("clientId"), persistence);      
           connOpts = new MqttConnectOptions();  
 
@@ -225,17 +228,25 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
   }
 
  
-  private void publish(final String topic, final String msg, final int qos, final boolean retained){
+  private void publish(final int id, final String topic, final String msg, final int qos, final boolean retained, final CallbackContext context){
+		Log.d(TAG, "publish " + topic + " | " + msg);
     cordova.getThreadPool().execute(new Runnable() {
       public void run() {
         try{
           client.publish(topic, msg.getBytes(), qos, retained);
-          onPublishCallbackContext.success(msg.getBytes());
+          context.success(id);
         }catch(MqttException e){
           Log.d(TAG, "Exception", e);
           Log.d(TAG, e.getMessage());
-          onPublishCallbackContext.error(e.getMessage());
-        }
+					try{
+          	JSONObject err = new JSONObject();
+						err.put("id", id);
+						err.put("error", e.getMessage());
+          	context.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, err));
+        	}catch(JSONException jsonException){
+          	context.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, jsonException.getMessage()));
+					}
+				}
       }
     });
   }
