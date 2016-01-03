@@ -50,20 +50,6 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
   private CallbackContext onSubscribeCallbackContext;
   private CallbackContext onUnsubscribeCallbackContext;
 
-/*	private String host;
-	private int port;
-	private int qos;
-	private String clientId;
-	private String username;
-	private String password;
-	private boolean ssl;
-	private int keepAlive;
-	private int timeout;
-	private boolean cleanSession;
-	private int protocol;
-	private boolean offlineCaching;
-*/
-
   public void deliveryComplete(IMqttDeliveryToken token) { 
 		JSONObject message = new JSONObject();
     final String jsonString = message.toString();
@@ -118,15 +104,13 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
       }else{
         options = new JSONObject();
       }
-      onConnectCallbackContext = callbackContext;
 			Log.d(TAG, "" + host + " : " + port);
-      connect(host, port, options);
+      connect(host, port, options, callbackContext);
       return true;
 
     //Disconnect
     }else if (action.equals("disconnect")){
-      onDisconnectCallbackContext = callbackContext;
-      disconnect();
+      disconnect(callbackContext);
       return true;
 
     //Publish
@@ -141,23 +125,21 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
 
     //Subscribe
     }else if (action.equals("subscribe")){
-      onSubscribeCallbackContext = callbackContext;
       String topic = args.getString(0);
       int qos = args.getInt(1);
-      subscribe(topic, qos);
+      subscribe(topic, qos, callbackContext);
       return true;
 
     //Unsubscribe
     }else if (action.equals("unsubscribe")){
-      onUnsubscribeCallbackContext = callbackContext;
       String topic = args.getString(0);
-      unsubscribe(topic);
+      unsubscribe(topic, callbackContext);
       return true;
     }
     return false;
   }
 
-  private void connect(final String host, final int port, final JSONObject options){
+  private void connect(final String host, final int port, final JSONObject options, final CallbackContext callbackContext){
     final Context context = cordova.getActivity().getApplicationContext(); 
     final MQTTPlugin self = this;
 
@@ -198,43 +180,57 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
           client.connect(connOpts);
 
           client.setCallback((MqttCallback) self);  
-          onConnectCallbackContext.success((client.isConnected()?1:0));
+         	JSONObject ret = new JSONObject();
+					ret.put("status", client.isConnected()?1:0);
+          callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, ret));
         }catch(JSONException e){
           Log.d(TAG, "Exception", e);
-          onConnectCallbackContext.error(e.getMessage());
+         	callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, e.getMessage()));
         }catch(MqttException e){
           Log.d(TAG, "Exception", e);
           Log.d(TAG, e.getMessage());
-          onConnectCallbackContext.error(e.getMessage());
+         	callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, e.getMessage()));
         }
       }
     });
   }
 
  
-  private void disconnect(){
+  private void disconnect(final CallbackContext callbackContext){
     cordova.getThreadPool().execute(new Runnable() {
       public void run() {
         try{
           client.disconnect();
-          onDisconnectCallbackContext.success(((!client.isConnected())?1:0));
+         	JSONObject ret = new JSONObject();
+					ret.put("status", client.isConnected()?1:0);
+          callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, ret));
         }catch(MqttException e){
           Log.d(TAG, "Exception", e);
           Log.d(TAG, e.getMessage());
-          onDisconnectCallbackContext.error(e.getMessage());
+         	callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, e.getMessage()));
+       	}catch(JSONException jsonException){
+         	callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, jsonException.getMessage()));
         }
       }
     });
   }
 
  
-  private void publish(final int id, final String topic, final String msg, final int qos, final boolean retained, final CallbackContext context){
+  private void publish(final int id, final String topic, final String msg, final int qos, final boolean retained, final CallbackContext callbackContext){
 		Log.d(TAG, "publish " + topic + " | " + msg);
     cordova.getThreadPool().execute(new Runnable() {
       public void run() {
         try{
           client.publish(topic, msg.getBytes(), qos, retained);
-          context.success(id);
+         	JSONObject ret = new JSONObject();
+					ret.put("cacheId", id);
+					ret.put("topic", topic);
+					ret.put("message", msg);
+					ret.put("qos", qos);
+					ret.put("retain", retained);
+          callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, ret));
+       	}catch(JSONException jsonException){
+         	callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, jsonException.getMessage()));
         }catch(MqttException e){
           Log.d(TAG, "Exception", e);
           Log.d(TAG, e.getMessage());
@@ -242,9 +238,9 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
           	JSONObject err = new JSONObject();
 						err.put("id", id);
 						err.put("error", e.getMessage());
-          	context.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, err));
+          	callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, err));
         	}catch(JSONException jsonException){
-          	context.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, jsonException.getMessage()));
+          	callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, jsonException.getMessage()));
 					}
 				}
       }
@@ -252,32 +248,41 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
   }
 
 
-  private void subscribe(final String topic, final int qos){
+  private void subscribe(final String topic, final int qos, final CallbackContext callbackContext){
     cordova.getThreadPool().execute(new Runnable() {
       public void run() {
         try{
           client.subscribe(topic, qos);
-          onSubscribeCallbackContext.success();
+         	JSONObject ret = new JSONObject();
+					ret.put("topic", topic);
+					ret.put("qos", qos);
+          callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, ret));
         }catch(MqttException e){
           Log.d(TAG, "Exception", e);
           Log.d(TAG, e.getMessage());
-          onSubscribeCallbackContext.error(e.getMessage());
+         	callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, e.getMessage()));
+       	}catch(JSONException jsonException){
+         	callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, jsonException.getMessage()));
         }
-      }
+			}
     });
   }
 
 
-  private void unsubscribe(final String topic){
+  private void unsubscribe(final String topic, final CallbackContext callbackContext){
     cordova.getThreadPool().execute(new Runnable() {
       public void run() {
         try{
           client.unsubscribe(topic);
-          onUnsubscribeCallbackContext.success();
+         	JSONObject ret = new JSONObject();
+					ret.put("topic", topic);
+          callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, ret));
         }catch(MqttException e){
           Log.d(TAG, "Exception", e);
           Log.d(TAG, e.getMessage());
-          onUnsubscribeCallbackContext.error(e.getMessage());
+          callbackContext.error(e.getMessage());
+       	}catch(JSONException jsonException){
+         	callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, jsonException.getMessage()));
         }
       }
     });

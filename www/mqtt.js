@@ -52,7 +52,7 @@ var mqtt={
 								document.addEventListener("online", mqtt.onOnline, false);
 								document.addEventListener("offline", mqtt.onOffline, false);
 								if (!mqtt.isOnline()){
-									mqtt.reconnect();
+									mqtt._reconnect();
 								}
 								mqtt.onInit();			
               },
@@ -100,6 +100,10 @@ var mqtt={
         mqtt.onDisconnect = optional(success, function(){console.log("success");});
         mqtt.onDisconnectError = optional(fail, function(){console.log("fail");});
       break;
+      case 'reconnect':
+        mqtt.onReconnect = optional(success, function(){console.log("success");});
+        mqtt.onReconnectError = optional(fail, function(){console.log("fail");});
+      break;
       case 'publish':
         mqtt.onPublish = optional(success, function(){console.log("success");});
         mqtt.onPublishError = optional(fail, function(){console.log("fail");});
@@ -114,7 +118,13 @@ var mqtt={
       break;
       case 'message':
         mqtt.onMessage = optional(success, function(){console.log("success");});
-        mqtt.onMessageError = optional(fail, function(){console.log("fail");});
+			break;
+			case 'delivered':
+        mqtt.onDelivered = optional(success, function(){console.log("delivered");});
+			break;
+			case 'offline':
+        mqtt.onOffline = optional(success, function(){console.log("offline");});
+			break;
     }
   },
 
@@ -126,7 +136,7 @@ var mqtt={
 		mqtt._connect(
       function(success){
         console.log("Connected.");
-				mqtt.resendCached();
+				mqtt._resendCached();
         mqtt.onConnect();
       }, 
       function(err) {
@@ -139,13 +149,13 @@ var mqtt={
     cordova.exec(success, error, "MQTTPlugin", "connect", [mqtt.host, mqtt.port, mqtt.options]);
   },
 
-	reconnect: function(){
+	_reconnect: function(){
 		mqtt.disconnect();
 		console.log("Trying to Reconnect...");
 		mqtt._connect(
 			function connectSuccess(){
 				console.log("(re)Connected Again");
-				mqtt.resendCached();
+				mqtt._resendCached();
 				mqtt.onReconnect();
 			},
 			function connectError(){
@@ -168,7 +178,9 @@ var mqtt={
       "MQTTPlugin", "disconnect", []);
   },
 
-  publish: function(options){ //topic, payload, qos, retained){
+  publish: function(options, success, fail){ 
+		success = success || function(){};
+		fail = fail || function(){};
     var topic = (isset(options.topic)) ? options.topic : "public";  
     var message = (isset(options.message)) ? options.message : "";  
     var qos = (isset(options.qos)) ? options.qos : 0;  
@@ -179,7 +191,7 @@ var mqtt={
       mqtt.cache.transaction(function(tx){
         tx.executeSql("INSERT INTO cache(topic, message, qos, retain, sending) VALUES(?,?,?,?,?)", [topic, message, qos, retain,0], 
           function insertSuccess(tx, res){
-						mqtt.publishCached(tx);
+						mqtt._publishCached(tx);
           }, 
           function insertError(tx, err){
             console.log("Caching failed: ", err);
@@ -194,24 +206,26 @@ var mqtt={
     }else{
     	console.log("Direct Publishing " + message);
       mqtt._publish(null, topic, message, qos, retain,
-        function(success){
-          mqtt.onPublish(null);
+        function(message){
+					mqtt.onPublish(message);
+					success(message);
         }, 
         function(err) {
           console.log("direct publishing failed: ", err);
           mqtt.onPublishError(err, null);
+					fail(err);
         }
       ); 
     }
   },
 
-	resendCached: function(){
+	_resendCached: function(){
 		if (mqtt.offlineCaching){
-			mqtt.cache.transaction(function(tx){mqtt.publishCached(tx)});
+			mqtt.cache.transaction(function(tx){mqtt._publishCached(tx)});
 		}
 	},
 
-  publishCached: function(tx){
+  _publishCached: function(tx){
     tx.executeSql("SELECT * FROM cache WHERE sending = 0 ORDER BY id", [], 
       function selectSuccess(tx, res){
 				console.log("Found "+res.rows.length+" cached Messages");
@@ -223,7 +237,9 @@ var mqtt={
 						function updateSuccess(tx, res){
 							console.log("locked Message " + message.id);
           		mqtt._publish(message.id, message.topic, message.message, message.qos, message.retain, 
-		            function publishSuccess(id){
+
+		            function publishSuccess(message){
+									var id = message.cacheId;
 		              console.log("Message " + id + " published");
 									mqtt.cache.transaction(
 										function(tx){
@@ -243,7 +259,8 @@ var mqtt={
 											return false;	
 										}
 									);    
-    		         	mqtt.onPublish(id);  
+									delete(message.cacheId);
+									mqtt.onPublish(message);
 							  }, 
             	  function publishError(result){
              		  console.log("publishing failed : " + result.id );
@@ -310,58 +327,62 @@ var mqtt={
       "MQTTPlugin", "unsubscribe", [topic]);
   },
 
-
-
-
-
   onInit: function(){ 
     console.log("onInit");
   },
   onInitError: function(){ 
     console.error("onInitError");
   },
+
   onConnect: function(){ 
     console.log("onConnect");
   },
   onConnectError: function(){ 
     console.error("onConnectError");
   },
+
   onReconnect: function(){ 
     console.log("onReconnect");
   },
   onReconnectError: function(){ 
     console.error("onReconnectError");
   },
+
   onDisconnect: function(){ 
     console.log("onDisconnect");
   },
   onDisconnectError: function(){ 
     console.log("onDisconnectError");
   },
+
   onPublish: function(cacheId){ 
     console.log("onPublish " + cacheId);
   },
   onPublishError: function(error, id){ 
     console.log("onPublishError " + id + ": ", error );
   },
+
   onSubscribe: function(){ 
     console.log("onSubscribe");
   },
   onSubscribeError: function(){ 
     console.log("onSubscribeError");
   },
+
   onUnsubscribe: function(){ 
     console.log("onUnsubscribe");
   },
   onUnsubscribeError: function(){ 
     console.log("onUnsubscribeError");
   },
+
   onMessage: function(topic, message, packet){ 
     console.log("onMessage");
   },
   onMessageError: function(topic, message, packet){ 
     console.log("onMessageError");
   },
+
   onDelivered: function(){ 
     console.log("onDelivered");
   },
@@ -370,11 +391,13 @@ var mqtt={
 		console.log("Hi i am online");
   },
   onOffline: function(){ 
-		mqtt.reconnect();
+		mqtt._reconnect();
   },
+
   onError: function(){ 
     console.log("onError");  
   },
+
 	showCache: function(){
 		mqtt.cache.readTransaction(function(tx){
     	tx.executeSql("SELECT * FROM cache ORDER BY id", [], 
