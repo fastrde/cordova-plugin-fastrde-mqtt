@@ -1,8 +1,9 @@
 #import "CDVMQTTPlugin.h"
 
 @implementation CDVMQTTPlugin{
-  MQTTSession *session;  
+  MQTTSession* session;  
   NSString* onConnectCallbackId;
+	NSMutableDictionary* messages;
 }
 
 - (void)pluginInitialize{
@@ -10,6 +11,8 @@
   session = [[MQTTSession alloc] init];
   session.delegate = self; // setDelegate:self];
 	session.persistence.persistent = PERSISTENT;
+
+	messages = [[NSMutableDictionary alloc] init];
 }
 
 - (void)connect:(CDVInvokedUrlCommand*)command{
@@ -35,9 +38,9 @@
   if ([options objectForKey:@"clientId"]) session.clientId = [options objectForKey:@"clientId"];
   if ([options objectForKey:@"userName"]) session.userName = [options objectForKey:@"userName"];
   if ([options objectForKey:@"password"]) session.password = [options objectForKey:@"password"];
-  if ([options objectForKey:@"keepAliveInterval"]) session.keepAliveInterval = [[options objectForKey:@"keepAliveInterval"] integerValue];
-  if ([[options allKeys] containsObject:@"cleanSessionFlag"]) session.cleanSessionFlag = [[options objectForKey:@"cleanSessionFlag"] boolValue] ? YES : NO;
-  if ([options objectForKey:@"protocolLevel"]) session.protocolLevel = [[options objectForKey:@"protocolLevel"] integerValue];
+  if ([options objectForKey:@"keepAlive"]) session.keepAliveInterval = [[options objectForKey:@"keepAlive"] integerValue];
+  if ([[options allKeys] containsObject:@"cleanSession"]) session.cleanSessionFlag = [[options objectForKey:@"cleanSession"] boolValue] ? YES : NO;
+  if ([options objectForKey:@"protocol"]) session.protocolLevel = [[options objectForKey:@"protocol"] integerValue];
   if ([options objectForKey:@"ssl"]) ssl = [[options objectForKey:@"ssl"] boolValue] ? YES : NO;
 
   if (will){
@@ -53,9 +56,9 @@
   NSLog(@"clientId: %@", session.clientId);
   NSLog(@"userName: %@", session.userName);
   NSLog(@"password: %@", session.password);
-  NSLog(@"keepAliveInterval: %d", session.keepAliveInterval);
-  NSLog(@"cleanSessionFlag: %d", session.cleanSessionFlag);
-  NSLog(@"protocolLevel: %d", session.protocolLevel);
+  NSLog(@"keepAlive: %d", session.keepAliveInterval);
+  NSLog(@"cleanSession: %d", session.cleanSessionFlag);
+  NSLog(@"protocol: %d", session.protocolLevel);
   NSLog(@"ssl: %d", ssl);
 
   [session connectToHost:host port:port usingSSL:ssl];
@@ -75,14 +78,32 @@
     int qos = [[command.arguments objectAtIndex:2] integerValue];
     BOOL retained = [[command.arguments objectAtIndex:3] boolValue]? YES : NO;
   
-      [session publishData:[msg dataUsingEncoding:NSUTF8StringEncoding]
+      UInt16 msgID = [session publishData:[msg dataUsingEncoding:NSUTF8StringEncoding]
       onTopic:topic
       retain:retained
       qos:qos];
-
+		
     NSLog(@"publish %@ %@ %d %d", topic, msg, qos, retained);
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+  	NSDictionary *message= @{
+     	@"topic" : topic,
+     	@"message" : [[NSString alloc] initWithData:msg encoding:NSUTF8StringEncoding],
+     	@"qos" : [NSNumber numberWithInt:qos],
+     	@"retain" : [NSNumber numberWithBool:retained]
+  	};
+  	NSError *error;
+  	NSData *jsonData = [NSJSONSerialization dataWithJSONObject:message options:0 error:&error];
+  	NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+
+		if (qos == 0){
+    	pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    	[self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId messageAsString:jsonString];
+		}else if (msgID > 0){
+    	pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    	[self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId messageAsString:jsonString];
+		}else{
+    	pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
+    	[self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId messageAsString:@"Error: Message not published"];
+		}
   }];
 }
 
@@ -110,12 +131,7 @@
   }];
 }
 
-- (void)received:(int)type qos:(int)qos retained:(BOOL)retained duped:(BOOL)duped mid:(UInt16)mid data:(NSData *)data
-{
-  NSLog(@"received:%d qos:%d retained:%d duped:%d mid:%d data:%@", type, qos, retained, duped, mid, data);
-
-  //self.type = type;
-}
+#pragma MARK MQTTSessionDelegate
 
 - (void)newMessage:(MQTTSession *)session data:(NSData *)data onTopic:(NSString *)topic qos:(MQTTQosLevel)qos retained:(BOOL)retained mid:(unsigned int)mid
 {
@@ -134,12 +150,6 @@
   [self.commandDelegate evalJs:[NSString stringWithFormat:@"mqtt.onMessage(%@);", jsonString]];
 }
 
-- (void)messageDelivered:(MQTTSession*)session msgID(UInt16)msgID
-{
-	NSLog(@"Message ID:%u deliviered", msgID);
-}
-
-
 - (void)handleEvent:(MQTTSession *)session event:(MQTTSessionEvent)eventCode error:(NSError *)error
 {
   NSLog(@"handleEvent:%ld error:%@", (long)eventCode, error);
@@ -147,15 +157,62 @@
   //self.error = error;
 }
 
-- (void)ackTimeout:(NSNumber *)timeout
+- (void) connected:(MQTTSession *)session {
+  NSDictionary *status= @{
+     @"status" : 1
+  };
+  NSError *error;
+  NSData *jsonData = [NSJSONSerialization dataWithJSONObject:message options:0 error:&error];
+  NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+
+  [self.commandDelegate evalJs:[NSString stringWithFormat:@"mqtt.onConnect(%@);", jsonString]];
+
+  /*CDVPluginResult* pluginResult = nil;
+  pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:onConnectCallbackId];*/
+}  
+
+- (void) connectionRefused:(MQTTSession *)session error:(NSError*)error {
+  [self.commandDelegate evalJs:[NSString stringWithFormat:@"mqtt.onConnectError(%@);", [error localizedDescription]]];
+  /*CDVPluginResult* pluginResult = nil;
+  pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:[error localizedDescription]];
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:onConnectCallbackId];
+	*/
+}  
+
+- (void) connectionClosed:(MQTTSession *)session{
+  NSDictionary *status= @{
+     @"status" : 0
+  };
+  NSError *error;
+  NSData *jsonData = [NSJSONSerialization dataWithJSONObject:message options:0 error:&error];
+  NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+
+  [self.commandDelegate evalJs:[NSString stringWithFormat:@"mqtt.onOffline(%@);", jsonString]];
+}  
+
+- (void) connectionError:(MQTTSession *)session error:(NSError*)error {
+  [self.commandDelegate evalJs:[NSString stringWithFormat:@"mqtt.onConnectError(%@);", [error localizedDescription]]];
+}  
+
+- (void)messageDelivered:(MQTTSession*)session msgID(UInt16)msgID
 {
-  NSLog(@"ackTimeout: %f", [timeout doubleValue]);
-  //self.timeout = TRUE;
+  NSDictionary *status= @{
+     @"status" : 0
+  };
+  NSError *error;
+  NSData *jsonData = [NSJSONSerialization dataWithJSONObject:message options:0 error:&error];
+  NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+
+  [self.commandDelegate evalJs:[NSString stringWithFormat:@"mqtt.onDelivered(%@);", jsonString]];
+	NSLog(@"Message ID:%u deliviered", msgID);
 }
 
-- (void) connected:(MQTTSession *)session {
-  CDVPluginResult* pluginResult = nil;
-  pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-  [self.commandDelegate sendPluginResult:pluginResult callbackId:onConnectCallbackId];
-}  
+/*- (void)received:(int)type qos:(int)qos retained:(BOOL)retained duped:(BOOL)duped mid:(UInt16)mid data:(NSData *)data
+{
+  NSLog(@"received:%d qos:%d retained:%d duped:%d mid:%d data:%@", type, qos, retained, duped, mid, data);
+
+  //self.type = type;
+}*/
+
 @end
