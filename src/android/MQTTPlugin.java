@@ -210,7 +210,9 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
          	callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, e.getMessage()));
        	}catch(JSONException jsonException){
          	callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, jsonException.getMessage()));
-        }
+        }catch(Exception e){
+         	callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, e.getMessage()));
+				}
       }
     });
   }
