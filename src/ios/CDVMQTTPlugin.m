@@ -10,9 +10,9 @@
   NSLog(@"MQTT Initialized");
   session = [[MQTTSession alloc] init];
   session.delegate = self; // setDelegate:self];
-    session.persistence.persistent = YES;
+  session.persistence.persistent = YES;
 
-	messages = [[NSMutableDictionary alloc] init];
+  messages = [[NSMutableDictionary alloc] init];
 }
 
 - (void)connect:(CDVInvokedUrlCommand*)command{
@@ -36,8 +36,8 @@
   }
 
   if ([options objectForKey:@"clientId"]) session.clientId = [options objectForKey:@"clientId"];
-  //if ([options objectForKey:@"userName"]) session.userName = [options objectForKey:@"userName"];
-  //if ([options objectForKey:@"password"]) session.password = [options objectForKey:@"password"];
+  if ([options objectForKey:@"username"]) session.userName = [options objectForKey:@"username"];
+  if ([options objectForKey:@"password"]) session.password = [options objectForKey:@"password"];
   if ([options objectForKey:@"keepAlive"]) session.keepAliveInterval = [[options objectForKey:@"keepAlive"] integerValue];
   if ([[options allKeys] containsObject:@"cleanSession"]) session.cleanSessionFlag = [[options objectForKey:@"cleanSession"] boolValue] ? YES : NO;
   if ([options objectForKey:@"protocol"]) session.protocolLevel = [[options objectForKey:@"protocol"] integerValue];
@@ -80,34 +80,33 @@
     int qos = (int) [[command.arguments objectAtIndex:3] integerValue];
     BOOL retained = [[command.arguments objectAtIndex:4] boolValue]? YES : NO;
       
-      UInt16 msgID = [session publishData:[msg dataUsingEncoding:NSUTF8StringEncoding]
+    UInt16 msgID = [session publishData:[msg dataUsingEncoding:NSUTF8StringEncoding]
       onTopic:topic
       retain:retained
       qos:qos];
 		
     NSLog(@"publish(%d) %@ %@ %d %d", msgID, topic, msg, qos, retained);
-  	NSDictionary *message= @{
-        @"cacheId": [NSNumber numberWithInt:cacheId],
-     	@"topic" : topic,
-     	@"message" : msg,
-     	@"qos" : [NSNumber numberWithInt:qos],
-     	@"retain" : [NSNumber numberWithBool:retained]
-  	};
-  	NSError *error;
-  	NSData *jsonData = [NSJSONSerialization dataWithJSONObject:message options:0 error:&error];
-  	NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+    NSDictionary *message= @{
+      @"cacheId": [NSNumber numberWithInt:cacheId],
+      @"topic" : topic,
+      @"message" : msg,
+      @"qos" : [NSNumber numberWithInt:qos],
+      @"retain" : [NSNumber numberWithBool:retained]
+    };
+    NSError *error;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:message options:0 error:&error];
+    NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
     CDVPluginResult* pluginResult = nil;
-		if (qos == 0){
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:jsonString];
-            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-		}else if (msgID > 0){
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:jsonString];
-
-            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-        }else{
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error: Message not published"];
-            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-		}
+    if (qos == 0){
+      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:jsonString];
+      [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }else if (msgID > 0){
+      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:jsonString];
+      [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }else{
+      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error: Message not published"];
+      [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }
   }];
 }
 
@@ -166,20 +165,11 @@
   NSError *error;
   NSData *jsonData = [NSJSONSerialization dataWithJSONObject:status options:0 error:&error];
   NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-
   [self.commandDelegate evalJs:[NSString stringWithFormat:@"mqtt.onConnect(%@);", jsonString]];
-
-  /*CDVPluginResult* pluginResult = nil;
-  pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-  [self.commandDelegate sendPluginResult:pluginResult callbackId:onConnectCallbackId];*/
 }  
 
 - (void) connectionRefused:(MQTTSession *)session error:(NSError*)error {
   [self.commandDelegate evalJs:[NSString stringWithFormat:@"mqtt.onConnectError(%@);", [error localizedDescription]]];
-  /*CDVPluginResult* pluginResult = nil;
-  pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:[error localizedDescription]];
-  [self.commandDelegate sendPluginResult:pluginResult callbackId:onConnectCallbackId];
-	*/
 }  
 
 - (void) connectionClosed:(MQTTSession *)session{
@@ -189,8 +179,6 @@
   NSError *error;
   NSData *jsonData = [NSJSONSerialization dataWithJSONObject:status options:0 error:&error];
   NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-
-  //[self.commandDelegate evalJs:[NSString stringWithFormat:@"mqtt.onOffline(%@);", jsonString]];
 }  
 
 - (void) connectionError:(MQTTSession *)session error:(NSError*)error {
@@ -207,19 +195,6 @@
   NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
 
   [self.commandDelegate evalJs:[NSString stringWithFormat:@"mqtt.onDelivered(%@);", jsonString]];
-	NSLog(@"Message ID:%u deliviered", msgID);
+  NSLog(@"Message ID:%u deliviered", msgID);
 }
-
-/*- (void)received:(int)type qos:(int)qos retained:(BOOL)retained duped:(BOOL)duped mid:(UInt16)mid data:(NSData *)data
-{
-  NSLog(@"received:%d qos:%d retained:%d duped:%d mid:%d data:%@", type, qos, retained, duped, mid, data);
-
-  //self.type = type;
-}*/
-
 @end
-
-
-
-
-
