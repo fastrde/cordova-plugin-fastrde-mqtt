@@ -115,7 +115,7 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
 
     //Publish
     }else if (action.equals("publish")){
-      int id = args.getInt(0);
+      Integer id = args.optInt(0);
       String topic = args.getString(1);
       String msg = args.getString(2);
       int qos = args.getInt(3);
@@ -218,14 +218,16 @@ public class MQTTPlugin extends CordovaPlugin implements MqttCallback{
   }
 
  
-  private void publish(final int id, final String topic, final String msg, final int qos, final boolean retained, final CallbackContext callbackContext){
+  private void publish(final Integer id, final String topic, final String msg, final int qos, final boolean retained, final CallbackContext callbackContext){
 		Log.d(TAG, "publish " + topic + " | " + msg);
     cordova.getThreadPool().execute(new Runnable() {
       public void run() {
         try{
           client.publish(topic, msg.getBytes(), qos, retained);
          	JSONObject ret = new JSONObject();
-					ret.put("cacheId", id);
+					if (id != null){
+					  ret.put("cacheId", id);
+					}
 					ret.put("topic", topic);
 					ret.put("message", msg);
 					ret.put("qos", qos);
