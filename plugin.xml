@@ -22,6 +22,16 @@
     <header-file src="src/ios/CDVMQTTPlugin.h" />
     <source-file src="src/ios/CDVMQTTPlugin.m" />
 
+    <header-file src="src/ios/MQTTClient/MQTTClient.h" target-dir="MQTTClient"/>
+    <header-file src="src/ios/MQTTClient/MQTTDecoder.h" target-dir="MQTTClient"/>
+    <header-file src="src/ios/MQTTClient/MQTTEncoder.h" target-dir="MQTTClient"/>
+    <header-file src="src/ios/MQTTClient/MQTTFlow.h" target-dir="MQTTClient"/>
+    <header-file src="src/ios/MQTTClient/MQTTMessage.h" target-dir="MQTTClient"/>
+    <header-file src="src/ios/MQTTClient/MQTTPersistence.h" target-dir="MQTTClient"/>
+    <header-file src="src/ios/MQTTClient/MQTTSession.h" target-dir="MQTTClient"/>
+    <header-file src="src/ios/MQTTClient/MQTTSessionManager.h" target-dir="MQTTClient"/>
+    <header-file src="src/ios/MQTTClient/MQTTSSLSecurityPolicy.h" target-dir="MQTTClient"/>
+	  
     <framework src="CFNetwork.framework" />
     <framework src="CoreData.framework" />
     <framework src="src/ios/Frameworks/MQTTClient.framework" custom="true" />
