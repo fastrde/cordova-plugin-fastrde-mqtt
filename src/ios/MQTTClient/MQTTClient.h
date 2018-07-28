@@ -15,6 +15,6 @@
 
 #import <Foundation/Foundation.h>
 
-#import <MQTTClient/MQTTSession.h>
-#import <MQTTClient/MQTTMessage.h>
-#import <MQTTClient/MQTTSSLSecurityPolicy.h>
+#import <MQTTSession.h>
+#import <MQTTMessage.h>
+#import <MQTTSSLSecurityPolicy.h>
