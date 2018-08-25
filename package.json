@@ -1,6 +1,6 @@
 {
   "name": "cordova-plugin-fastrde-mqtt",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Cordova plugin to communicate via mqtt for ios and android",
   "cordova": {
     "id": "cordova-plugin-fastrde-mqtt",
